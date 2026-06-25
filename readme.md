@@ -229,6 +229,20 @@ We track the following custom Prometheus metrics:
 
 The system includes files under `k8s/` to implement a Canary Traffic-Splitting deployment model for `user-service`.
 
+### Traffic Routing Architecture
+```text
+                  [ External Traffic ]
+                           │
+                           ▼
+                 [ NGINX Ingress Controller ]
+                           │
+             ┌─────────────┴─────────────┐
+             │ (90% Traffic)             │ (10% Traffic)
+             ▼                           ▼
+    [ user-service-blue ]       [ user-service-green ]
+     (user-service:v1)           (user-service:v2)
+```
+
 ### Folder Layout & Manifests
 * **`k8s/user-service/user-service-blue/`**: Dedicated files for the Blue deployment (v1) and matching internal `user-service` resolver.
 * **`k8s/user-service/user-service-green/`**: Dedicated files for the Green deployment (v2).
