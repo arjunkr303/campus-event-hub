@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        ports:
+        - containerPort: 3000
+          name: web
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: "admin"
+        volumeMounts:
+        - name: config-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: config-dashboards
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: dashboards-volume
+          mountPath: /var/lib/grafana/dashboards
+      volumes:
+      - name: config-datasources
+        configMap:
+          name: grafana-config
+          items:
+          - key: prometheus.yaml
+            path: prometheus.yaml
+      - name: config-dashboards
+        configMap:
+          name: grafana-config
+          items:
+          - key: dashboards.yaml
+            path: dashboards.yaml
+      - name: dashboards-volume
+        configMap:
+          name: grafana-dashboard-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    app: grafana

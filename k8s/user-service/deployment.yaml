@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  labels:
+    app: user-service
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        image: user-service:v2
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_HOST
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: DB_PORT
+        - name: DB_USER
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: DB_USER
+        - name: DB_NAME
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: DB_NAME
+        - name: DB_PASSWORD
+          valueFrom: 
+            secretKeyRef:
+              name: user-service-secrets
+              key: DB_PASSWORD
+        - name: SECRET_KEY
+          valueFrom: 
+            secretKeyRef:
+              name: user-service-secrets
+              key: JWT_SECRET
+        - name: ALGORITHM
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: ALGORITHM
+        - name: POSTGRESQL_URL
+          value: "postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+        resources: 
+          requests:
+            cpu: "500m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 1

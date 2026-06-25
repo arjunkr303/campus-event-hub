@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-service
+  labels:
+    app: event-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: event-service
+  template:
+    metadata:
+      labels:
+        app: event-service
+    spec:
+      containers:
+      - name: event-service
+        image: event-service:v1
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: event-service-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom: 
+            configMapKeyRef:
+              name: event-service-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: event-service-config
+              key: DB_NAME
+        - name: DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: event-service-config
+              key: DB_USER
+        - name: ALGORITHM
+          valueFrom: 
+            configMapKeyRef:
+              name: event-service-config
+              key: ALGORITHM            
+        - name: DB_PASSWORD
+          valueFrom: 
+            secretKeyRef:
+              name: event-service-secrets
+              key: DB_PASSWORD
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: event-service-secrets
+              key: JWT_SECRET
+        - name: POSTGRESQL_URL
+          value: "postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"

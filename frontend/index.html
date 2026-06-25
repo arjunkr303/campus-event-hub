@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Event Hub - Discover, Register, and Connect</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome icons for rich aesthetics -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Local Stylesheet -->
+    <link rel="stylesheet" href="index.css">
+</head>
+<body class="dark-theme">
+    <!-- Navigation Bar -->
+    <header class="app-header">
+        <div class="nav-container">
+            <a href="#" class="brand" id="brand-link">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <span class="brand-name">Campus Event Hub</span>
+            </a>
+            
+            <nav class="main-nav" id="main-nav">
+                <a href="#" class="nav-link active" data-view="hero-catalog"><i class="fa-solid fa-calendar-days"></i> Events</a>
+                <a href="#" class="nav-link" data-view="registrations" id="nav-registrations" style="display: none;"><i class="fa-solid fa-ticket"></i> My Tickets</a>
+                <a href="#" class="nav-link" data-view="admin-panel" id="nav-admin" style="display: none;"><i class="fa-solid fa-sliders"></i> Admin Panel</a>
+                <a href="#" class="nav-link" data-view="profile" id="nav-profile" style="display: none;"><i class="fa-solid fa-user"></i> Profile</a>
+                <a href="#" class="nav-link btn-login-nav" data-view="auth" id="nav-auth-btn"><i class="fa-solid fa-right-to-bracket"></i> Login</a>
+            </nav>
+
+            <button class="mobile-nav-toggle" id="mobile-toggle" aria-label="Toggle menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="app-main">
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="toast-container"></div>
+
+        <!-- 1. HERO & CATALOG VIEW (Default) -->
+        <section id="view-hero-catalog" class="app-view active">
+            <!-- Hero Landing Section -->
+            <div class="hero-section">
+                <div class="hero-content">
+                    <span class="hero-badge"><i class="fa-solid fa-sparkles"></i> College Campus Life</span>
+                    <h1 class="hero-title">Discover and Connect through <span>Campus Events</span></h1>
+                    <p class="hero-subtitle">Book seats for workshops, hackathons, seminars, and cultural festivals happening around your university campus. All in one place.</p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary btn-lg" id="hero-browse-btn">Explore Events <i class="fa-solid fa-arrow-right"></i></button>
+                        <a href="http://localhost:3000/d/adhgtg9/new-dashboard?orgId=1&from=now-6h&to=now&timezone=browser" target="_blank" class="btn btn-secondary btn-lg" id="hero-grafana-btn"><i class="fa-solid fa-chart-line"></i> View Metrics</a>
+                    </div>
+                </div>
+                <div class="hero-glow"></div>
+            </div>
+
+            <!-- Events Search & Filter Container -->
+            <div class="catalog-filters-section" id="events-section">
+                <div class="section-header">
+                    <h2>Upcoming Events</h2>
+                    <p class="section-tagline">Find what interests you and save your spot</p>
+                </div>
+                
+                <div class="search-filter-bar">
+                    <div class="search-input-wrapper">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search event titles, descriptions, locations...">
+                    </div>
+                    <div class="filter-controls">
+                        <div class="select-wrapper">
+                            <i class="fa-solid fa-filter filter-icon"></i>
+                            <select id="filter-seats">
+                                <option value="all">All Seats Availability</option>
+                                <option value="available">Available Seats Only</option>
+                                <option value="full">Sold Out Only</option>
+                            </select>
+                        </div>
+                        <input type="date" id="filter-date" placeholder="Filter by date">
+                        <button class="btn btn-icon btn-secondary" id="btn-reset-filters" title="Reset Filters">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Events Grid -->
+            <div class="events-grid-wrapper">
+                <div id="events-loader" class="loader-container" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Fetching amazing events for you...</p>
+                </div>
+                <div id="events-grid" class="events-grid">
+                    <!-- Event Cards populated via JS -->
+                </div>
+                <div id="events-empty-state" class="empty-state" style="display: none;">
+                    <div class="empty-icon"><i class="fa-regular fa-calendar-times"></i></div>
+                    <h3>No Events Found</h3>
+                    <p>We couldn't find any events matching your search or filters. Try adjusting your settings.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. AUTHENTICATION VIEW (Login & Register) -->
+        <section id="view-auth" class="app-view">
+            <div class="auth-card-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <div class="auth-logo">
+                            <i class="fa-solid fa-graduation-cap"></i>
+                        </div>
+                        <h2 id="auth-title">Welcome Back</h2>
+                        <p id="auth-subtitle">Sign in to your account to reserve seats</p>
+                    </div>
+
+                    <!-- Auth Form Tabs -->
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" id="tab-login-btn">Log In</button>
+                        <button class="auth-tab" id="tab-register-btn">Sign Up</button>
+                    </div>
+
+                    <!-- LOGIN FORM -->
+                    <form id="form-login" class="auth-form active">
+                        <div class="form-group">
+                            <label for="login-email">Email Address</label>
+                            <div class="input-wrapper">
+                                <i class="fa-regular fa-envelope"></i>
+                                <input type="email" id="login-email" required placeholder="username@gmail.com">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-lock"></i>
+                                <input type="password" id="login-password" required placeholder="••••••••">
+                                <button type="button" class="btn-toggle-password"><i class="fa-regular fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Log In <i class="fa-solid fa-right-to-bracket"></i></button>
+                    </form>
+
+                    <!-- REGISTER FORM -->
+                    <form id="form-register" class="auth-form">
+                        <div class="form-group">
+                            <label for="register-name">Full Name</label>
+                            <div class="input-wrapper">
+                                <i class="fa-regular fa-user"></i>
+                                <input type="text" id="register-name" required placeholder="John Doe">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-email">Email Address</label>
+                            <div class="input-wrapper">
+                                <i class="fa-regular fa-envelope"></i>
+                                <input type="email" id="register-email" required placeholder="username@gmail.com">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-role">Role</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-users-gear"></i>
+                                <select id="register-role" required>
+                                    <option value="User">Student / Regular User</option>
+                                    <option value="Organizer">Event Organizer</option>
+                                    <option value="Admin">Administrator</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-password">Password</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-lock"></i>
+                                <input type="password" id="register-password" required placeholder="Min 6 characters">
+                                <button type="button" class="btn-toggle-password"><i class="fa-regular fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Create Account <i class="fa-solid fa-user-plus"></i></button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. MY REGISTRATIONS (TICKETS) VIEW -->
+        <section id="view-registrations" class="app-view">
+            <div class="section-container">
+                <div class="section-header-row">
+                    <div>
+                        <h2>My Event Tickets</h2>
+                        <p class="section-tagline">Here are the events you're currently registered for</p>
+                    </div>
+                </div>
+
+                <div id="tickets-loader" class="loader-container" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Loading your registration tickets...</p>
+                </div>
+
+                <div id="tickets-grid" class="tickets-grid">
+                    <!-- Ticket Cards loaded dynamically -->
+                </div>
+
+                <div id="tickets-empty-state" class="empty-state">
+                    <div class="empty-icon"><i class="fa-solid fa-ticket-simple"></i></div>
+                    <h3>No Registered Events</h3>
+                    <p>You haven't registered for any events yet. Check out the Events list and secure your seat!</p>
+                    <button class="btn btn-primary" id="btn-browse-from-tickets">Browse Events</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. PROFILE VIEW -->
+        <section id="view-profile" class="app-view">
+            <div class="profile-container">
+                <div class="profile-card">
+                    <div class="profile-cover"></div>
+                    <div class="profile-avatar-wrapper">
+                        <div class="profile-avatar" id="profile-avatar-initials">U</div>
+                    </div>
+                    <div class="profile-body">
+                        <h2 class="profile-name" id="profile-name">Loading...</h2>
+                        <div class="profile-role" id="profile-role">Student</div>
+                        
+                        <div class="profile-details-grid">
+                            <div class="profile-detail-item">
+                                <div class="detail-label"><i class="fa-regular fa-envelope"></i> Email</div>
+                                <div class="detail-value" id="profile-email">Loading...</div>
+                            </div>
+                            <div class="profile-detail-item">
+                                <div class="detail-label"><i class="fa-solid fa-id-badge"></i> User ID</div>
+                                <div class="detail-value" id="profile-user-id">-</div>
+                            </div>
+                        </div>
+
+                        <div class="profile-actions">
+                            <button class="btn btn-secondary btn-block" id="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. ADMIN/ORGANIZER PANEL VIEW -->
+        <section id="view-admin-panel" class="app-view">
+            <div class="admin-container">
+                <div class="admin-sidebar">
+                    <h3 class="sidebar-title"><i class="fa-solid fa-chart-pie"></i> Control Center</h3>
+                    <div class="admin-tabs">
+                        <button class="admin-tab active" data-tab="create-event"><i class="fa-solid fa-circle-plus"></i> Create New Event</button>
+                        <button class="admin-tab" data-tab="manage-events" id="tab-manage-btn"><i class="fa-solid fa-calendar-check"></i> Manage Events</button>
+                        <button class="admin-tab" data-tab="monitoring"><i class="fa-solid fa-chart-line"></i> Monitoring & Metrics</button>
+                    </div>
+                </div>
+                
+                <div class="admin-content-area">
+                    <!-- TAB 1: CREATE EVENT -->
+                    <div id="tab-create-event" class="admin-tab-content active">
+                        <div class="admin-content-header">
+                            <h3>Create New Campus Event</h3>
+                            <p>Fill out the details below to add a new event to the catalog</p>
+                        </div>
+                        <form id="form-create-event" class="admin-form">
+                            <input type="hidden" id="event-edit-id" value="">
+                            <div class="form-row">
+                                <div class="form-group col-12">
+                                    <label for="event-title">Event Title</label>
+                                    <input type="text" id="event-title" required placeholder="e.g., Spring Hackathon 2026">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="event-description">Description</label>
+                                <textarea id="event-description" required rows="4" placeholder="Describe what the event is about, requirements, speaker information..."></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-6">
+                                    <label for="event-location">Location</label>
+                                    <input type="text" id="event-location" required placeholder="e.g., Auditorium Hall 2">
+                                </div>
+                                <div class="form-group col-6">
+                                    <label for="event-date">Date & Time</label>
+                                    <input type="datetime-local" id="event-date" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-6">
+                                    <label for="event-seats">Available Seats</label>
+                                    <input type="number" id="event-seats" required min="1" placeholder="e.g., 100">
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-secondary" id="btn-cancel-edit" style="display: none;">Cancel Edit</button>
+                                <button type="submit" class="btn btn-primary" id="btn-submit-event">Publish Event <i class="fa-solid fa-paper-plane"></i></button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- TAB 2: MANAGE EVENTS -->
+                    <div id="tab-manage-events" class="admin-tab-content">
+                        <div class="admin-content-header">
+                            <h3>Manage Published Events</h3>
+                            <p>Edit or delete events currently running in the catalog</p>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Location</th>
+                                        <th>Date</th>
+                                        <th>Seats Left</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-events-list">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="admin-empty-state" class="empty-state" style="display: none;">
+                            <div class="empty-icon"><i class="fa-regular fa-folder-open"></i></div>
+                            <h3>No Events Created Yet</h3>
+                            <p>You haven't created any events. Go to "Create New Event" to publish your first campus event.</p>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: MONITORING & METRICS -->
+                    <div id="tab-monitoring" class="admin-tab-content">
+                        <div class="admin-content-header">
+                            <h3>System Monitoring & Metrics</h3>
+                            <p>Access infrastructure dashboards tracking user registrations, Kafka topics, and server performance.</p>
+                        </div>
+                        <div class="monitoring-grid">
+                            <div class="metric-card">
+                                <div class="metric-header">
+                                    <i class="fa-solid fa-chart-line metric-icon text-primary"></i>
+                                    <h4>Grafana Analytics</h4>
+                                </div>
+                                <p>Visualize custom application metrics (registrations created, available seat gauges, and API gateway throughput).</p>
+                                <div class="metric-link-wrapper">
+                                    <a href="http://localhost:3000/d/adhgtg9/new-dashboard?orgId=1&from=now-6h&to=now&timezone=browser" target="_blank" class="btn btn-primary btn-block"><i class="fa-solid fa-square-arrow-up-right"></i> Open Grafana Dashboard</a>
+                                </div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-header">
+                                    <i class="fa-solid fa-server metric-icon text-success"></i>
+                                    <h4>Prometheus Targets</h4>
+                                </div>
+                                <p>Monitor raw system metrics, service target discovery, and alert states collected from microservices.</p>
+                                <div class="metric-link-wrapper">
+                                    <a href="http://localhost:9090" target="_blank" class="btn btn-secondary btn-block"><i class="fa-solid fa-square-arrow-up-right"></i> Open Prometheus UI</a>
+                                </div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div class="metric-header">
+                                    <i class="fa-solid fa-cubes metric-icon text-warning"></i>
+                                    <h4>Kafka UI Control</h4>
+                                </div>
+                                <p>Inspect Kafka message brokers, manage user-registration topics, and monitor active consumer groups.</p>
+                                <div class="metric-link-wrapper">
+                                    <a href="http://localhost:8088" target="_blank" class="btn btn-secondary btn-block"><i class="fa-solid fa-square-arrow-up-right"></i> Open Kafka Control UI</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Microservices Health Watch (Real-time port monitor) -->
+                        <div class="admin-content-header" style="margin-top: 40px;">
+                            <h3>Microservices Health Watch</h3>
+                            <p>Real-time online status and response times of backend ports and components</p>
+                        </div>
+                        <div class="service-health-grid" id="service-health-grid">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for Event Details -->
+    <div id="event-modal" class="modal-backdrop">
+        <div class="modal-card">
+            <button class="modal-close-btn" id="modal-close" aria-label="Close modal">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="modal-header">
+                <span class="modal-category" id="modal-event-date-badge">DATE</span>
+                <h3 class="modal-title" id="modal-event-title">Event Title</h3>
+            </div>
+            <div class="modal-body">
+                <p id="modal-event-description" class="modal-description">This is the description of the event...</p>
+                <div class="modal-info-grid">
+                    <div class="modal-info-item">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <div>
+                            <strong>Location</strong>
+                            <span id="modal-event-location">Hall A</span>
+                        </div>
+                    </div>
+                    <div class="modal-info-item">
+                        <i class="fa-solid fa-chair"></i>
+                        <div>
+                            <strong>Seats Available</strong>
+                            <span id="modal-event-seats">50 seats left</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modal-btn-close">Close</button>
+                <button class="btn btn-primary" id="modal-btn-action">Register Seat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Scripts -->
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: ["Main", "master"]
+  pull_request:
+    branches: ["Main", "master"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Run Formatting check (Ruff)
+        run: |
+          pip install ruff
+          ruff format --check .
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          for service in event-service notification-service user-service registration-service; do
+            if [ -f "$service/requirements.txt" ]; then
+              echo "Installing dependencies for $service...."
+              pip install -r "$service/requirements.txt"
+            fi
+          done
+      
+      - name: Install Test dependencies
+        run: |
+          pip install pytest httpx
+
+      - name: Run Service Tests
+        env:
+          POSTGRESQL_URL: "sqlite:///test.db"
+          SECRET_KEY: "cisecretkey123"
+          ALGORITHM: "HS256"
+          KAFKA_BOOTSTRAP_SERVERS: "localhost:9092"
+        run: |
+          for service in user-service event-service registration-service notification-service; do
+            if [ -f "$service/tests/test_main.py" ]; then
+              echo "Running tests for $service..."
+              cd "$service"
+              PYTHONPATH=. pytest tests/test_main.py
+              cd ..
+            fi
+          done
+
+      - name: Build Docker Images
+        run: |
+          for service in user-service event-service registration-service notification-service; do
+            if [ -f "$service/dockerfile" ]; then
+              echo "Building Docker image for $service..."
+              docker build -t "campus-event-hub-$service:latest" -f "$service/dockerfile" "$service"
+            fi
+          done
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/Main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Login in to Docker hub
+        uses: docker/login-actions@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and Push Docker Images
+        run: |
+          for service in user-service event-service registration-service notification-service; do
+            if [ -f "$service/dockerfile" ]; then
+              image_name="${{ secrets.DOCKER_USERNAME }}/campus-event-hub-$service"
+              echo "Building and Pushing $image_name..."
+              docker build -t "$image_name:latest" -f "$service/dockerfile" "$service"
+              docker push "$image_name:latest"
+            fi
+          done
+
+      - name: Deploy to Cloud VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_IP_ADDRESS }}
+          username: ${{ secrets.VM_SSH_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            cd /path/to/your/deployed/project
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+            docker compose pull
+            docker compose up -d
