@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  labels:
+    app: user-service
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.containerPort }}
+        env:
+        - name: DB_HOST
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: DB_PORT
+        - name: DB_USER
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: DB_USER
+        - name: DB_NAME
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: DB_NAME
+        - name: DB_PASSWORD
+          valueFrom: 
+            secretKeyRef:
+              name: user-service-secrets
+              key: DB_PASSWORD
+        - name: SECRET_KEY
+          valueFrom: 
+            secretKeyRef:
+              name: user-service-secrets
+              key: JWT_SECRET
+        - name: ALGORITHM
+          valueFrom: 
+            configMapKeyRef:
+              name: user-service-config
+              key: ALGORITHM
+        - name: POSTGRESQL_URL
+          value: "postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+        resources: 
+          {{- toYaml .Values.resources | nindent 10 }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.containerPort }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.containerPort }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 1

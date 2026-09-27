@@ -1,0 +1,51 @@
+replicaCount: 3
+
+image:
+  repository: user-service
+  pullPolicy: Never
+  tag: "v2"
+
+containerPort: 8000
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "512Mi"
+
+service:
+  name: user-service
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+config:
+  dbHost: "aws-1-ap-southeast-1.pooler.supabase.com"
+  dbPort: "6543"
+  dbUser: "postgres.wiabbgkeaetdetnygrge"
+  dbName: "postgres"
+  algorithm: "HS256"
+  kafkaBroker: "kafka:29092"
+
+secrets:
+  dbPassword: "change-me"
+  jwtSecret: "change-me"
+
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 10
+
+ingress:
+  enabled: true
+  annotations: 
+    nginx.ingress.Kubernetes.io/rewrite-target: /$1
+  hosts:
+    - host: ""
+      paths:
+        - path: /api/users/?(.*)
+          pathType: ImplementationSpecific
