@@ -19,6 +19,7 @@ spec:
       labels:
         app: user-service
     spec:
+      serviceAccountName: user-service-sa
       containers:
       - name: user-service
         image: user-service:v2
