@@ -8,6 +8,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  ingressClassName: nginx
   rules:
   {{- range .Values.ingress.hosts }}
   {{- if .host }}
