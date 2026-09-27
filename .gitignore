@@ -1,5 +1,16 @@
-venv
-__pycache__
+# Environment variables
 .env
-**/secret.yaml
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Virtual environments
+venv/
+.venv/
+
+# Secrets
 secrets-values.yaml
+secret.yaml

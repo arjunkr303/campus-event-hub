@@ -41,7 +41,7 @@ jobs:
       - name: Run Service Tests
         env:
           POSTGRESQL_URL: "sqlite:///test.db"
-          SECRET_KEY: "cisecretkey123"
+          SECRET_KEY: ${{ secrets.CI_SECRET_KEY }}
           ALGORITHM: "HS256"
           KAFKA_BOOTSTRAP_SERVERS: "localhost:9092"
         run: |
