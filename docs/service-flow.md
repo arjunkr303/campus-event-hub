@@ -1,42 +1,252 @@
-## Microservices System Flow
-This file describes how the services, NGINX gateway, Kafka, and the database interact with each other.
+# Service Request & Messaging Flow
 
-### Flow 1: User Authentication (Login)
----
-1. **Client** sends login credentials (`POST /auth/login`) to the **NGINX Gateway** on port `8000`.
-2. **NGINX** proxies the request to the **User Service** (`port 8001`).
-3. **User Service** verifies password hashes against PostgreSQL.
-4. **User Service** generates a JWT access token using its `SECRET_KEY` and returns it to the client.
+> Step-by-step documentation of how requests flow through the system — from client to NGINX gateway to microservices, database, and Kafka.
 
-### Flow 2: Accessing Protected Endpoints (Gateway Verification)
 ---
-1. **Client** requests a protected route like `GET /api/events` and includes the header:
-   `Authorization: Bearer <token>`
-2. **NGINX** intercepts the request and makes an internal subrequest to the **User Service** (`GET /auth/verify`).
-3. **User Service** decodes the JWT and validates the signature.
-   * If **Valid**: Returns `200 OK`. NGINX proceeds to forward the client's request to the **Event Service** (`port 8002`).
-   * If **Invalid**: Returns `401 Unauthorized`. NGINX blocks the request and rejects the client.
 
-### Flow 3: Event Booking & Notifications (End-to-End)
----
-1. **Client** sends `POST /registration` request (with JWT token) to **NGINX Gateway**.
-2. **NGINX** verifies the token via **User Service** and forwards the request to **Registration Service** (`port 8003`).
-3. **Registration Service** queries **Event Service** (`port 8002`) via HTTP to get available seats.
-4. If seats are available, **Registration Service** sends an HTTP `PATCH /event/event/{id}/decrease_seat` request to **Event Service** to decrement the seat count.
-5. **Registration Service** writes the registration to its PostgreSQL database and publishes a **`registration-created`** event to **Kafka**.
-6. **Notification Service** consumes the event from Kafka and sends a confirmation email to the user.
+## Flow 1: User Authentication (Login)
 
-### Flow 4: Monitoring & Metrics
----
-1. **Prometheus** (`port 9090`) scrapes metrics from:
-   - **NGINX Gateway** (via `nginx_exporter`).
-   - **All three Microservices** (via `/metrics` endpoints).
-2. **Grafana** (`port 3000`) queries Prometheus to visualize system health and custom metrics (e.g., available seats, event count).
+```
+  Client              NGINX (:8000)         User Service (:8001)      PostgreSQL
+    │                      │                        │                      │
+    │  POST /auth/login    │                        │                      │
+    │  {email, password}   │                        │                      │
+    │─────────────────────►│                        │                      │
+    │                      │  proxy_pass            │                      │
+    │                      │  POST /auth/login      │                      │
+    │                      │───────────────────────►│                      │
+    │                      │                        │  Query user by email │
+    │                      │                        │─────────────────────►│
+    │                      │                        │    User record       │
+    │                      │                        │◄─────────────────────│
+    │                      │                        │                      │
+    │                      │                        │  Verify password     │
+    │                      │                        │  hash (bcrypt)       │
+    │                      │                        │                      │
+    │                      │                        │  Generate JWT        │
+    │                      │                        │  (SECRET_KEY + HS256)│
+    │                      │                        │                      │
+    │                      │  {access_token,        │                      │
+    │                      │   token_type: "bearer"}│                      │
+    │                      │◄───────────────────────│                      │
+    │  200 OK + JWT token  │                        │                      │
+    │◄─────────────────────│                        │                      │
+    │                      │                        │                      │
+```
 
-### Flow 5: Booking Cancellation & Seat Restoration (End-to-End)
+**Key details:**
+- NGINX proxies `/auth/*` directly to `user-service:8000/auth/` — no JWT check needed
+- Password is verified against bcrypt hash stored in PostgreSQL
+- JWT payload contains user ID and role
+
 ---
-1. **Client** sends `DELETE /delete_registration/{user_id}?event_id={id}` request (with JWT token) to **NGINX Gateway**.
-2. **NGINX** verifies the token and forwards the request to **Registration Service** (`port 8003`).
-3. **Registration Service** checks if the registration exists, deletes the record from its PostgreSQL database, and commits.
-4. Upon successful deletion, **Registration Service** sends an HTTP `PATCH /event/event/{id}/increase_seat` request to **Event Service** to restore the seat.
-5. **Event Service** increments the seat count and updates its Prometheus available seats gauge (`EVENT_AVAILABLE_SEATS_GAUGE`).
+
+## Flow 2: Accessing Protected Endpoints (Gateway JWT Verification)
+
+```
+  Client              NGINX (:8000)         User Service (:8001)    Event Service (:8002)
+    │                      │                        │                      │
+    │  GET /api/events     │                        │                      │
+    │  Authorization:      │                        │                      │
+    │  Bearer <token>      │                        │                      │
+    │─────────────────────►│                        │                      │
+    │                      │                        │                      │
+    │                      │  Internal subrequest   │                      │
+    │                      │  GET /auth/verify      │                      │
+    │                      │  Authorization: Bearer │                      │
+    │                      │───────────────────────►│                      │
+    │                      │                        │                      │
+    │                      │                        │                      │
+    │       ┌──────────────┼── If Token VALID ──────┤                      │
+    │       │              │                        │                      │
+    │       │              │  200 OK                │                      │
+    │       │              │◄───────────────────────│                      │
+    │       │              │                        │                      │
+    │       │              │  proxy_pass                                   │
+    │       │              │  GET /event/events                            │
+    │       │              │──────────────────────────────────────────────►│
+    │       │              │                                    Event list │
+    │       │              │◄──────────────────────────────────────────────│
+    │       │  200 OK      │                        │                      │
+    │       │  + events    │                        │                      │
+    │       │◄─────────────│                        │                      │
+    │       │              │                        │                      │
+    │       ├──────────────┼── If Token INVALID ────┤                      │
+    │       │              │                        │                      │
+    │       │              │  401 Unauthorized      │                      │
+    │       │              │◄───────────────────────│                      │
+    │       │  401         │                        │                      │
+    │       │  (blocked)   │                        │                      │
+    │       │◄─────────────│                        │                      │
+    │       └──────────────│                        │                      │
+    │                      │                        │                      │
+```
+
+**Key details:**
+- NGINX uses `auth_request` directive to make an internal subrequest to `/auth/verify`
+- The subrequest passes the original `Authorization` header
+- `proxy_pass_request_body off` ensures the original request body isn't sent to the verify endpoint
+- Protected routes: `/api/events`, `/api/events/create`, `/registration`
+
+---
+
+## Flow 3: Event Booking & Notifications (End-to-End)
+
+```
+  Client           NGINX            User Svc         Reg. Svc         Event Svc          Kafka
+    │                 │                 │                 │                 │                 │
+    │ POST            │                 │                 │                 │                 │
+    │ /registration   │                 │                 │                 │                 │
+    │ + JWT token     │                 │                 │                 │                 │
+    │────────────────►│                 │                 │                 │                 │
+    │                 │                 │                 │                 │                 │
+    │                 │ auth subrequest │                 │                 │                 │
+    │                 │────────────────►│                 │                 │                 │
+    │                 │  200 OK         │                 │                 │                 │
+    │                 │◄────────────────│                 │                 │                 │
+    │                 │                 │                 │                 │                 │
+    │                 │ proxy_pass      │                 │                 │                 │
+    │                 │─────────────────────────────────►│                 │                 │
+    │                 │                 │                 │                 │                 │
+    │                 │                 │                 │ Check duplicate │                 │
+    │                 │                 │                 │ registration    │                 │
+    │                 │                 │                 │                 │                 │
+    │                 │                 │                 │ HTTP GET        │                 │
+    │                 │                 │                 │ (check seats)   │                 │
+    │                 │                 │                 │────────────────►│                 │
+    │                 │                 │                 │  seats > 0      │                 │                 │                 │
+    │                 │                 │                 │ │◄────────────────│                 │                 │
+    │                 │                 │                 │                 │                 │                 │                 │
+    │                 │                 │                 │ HTTP PATCH      │                 │
+    │                 │                 │                 │ /decrease_seat  │                 │
+    │                 │                 │                 │────────────────►│                 │
+    │                 │                 │                 │  Updated event  │                 │
+    │                 │                 │                 │◄────────────────│                 │
+    │                 │                 │                 │                 │                 │                 │
+    │                 │                 │                 │ INSERT into DB  │                 │                 │
+    │                 │                 │                 │                 │                 │
+    │                 │                 │                 │ (PostgreSQL)    │                 │                 │
+    │                 │                 │                 │                 │                 │                 │
+    │                 │                 │                 │ Publish event   │                 │                 │
+    │                 │                 │                 │─────────────────────────────────► │
+    │                 │                 │                 │                 │                 │
+    │                 │  200 OK         │                 │                 │                 │
+    │                 │◄─────────────────────────────────│                 │                 │
+    │  200 OK         │                 │                 │                 │                 │
+    │◄────────────────│                 │                 │                 │                 │
+    │                 │                 │                 │                 │                 │
+    │                 │                 │                 │       ── Async (background) ──   │
+    │                 │                 │                 │                 │                 │
+    │                 │                 │                 │                 │    Consume           │
+    │                 │                 │                 │                 │    event             │
+    │                 │                 │                 │                 │                 │
+    │                 │                 │                 │          Notification Service           │
+    │                 │                 │                 │          sends email to student           │
+    │                 │                 │                 │                 │                 │
+```
+
+**Key details:**
+- Registration Service makes **synchronous HTTP calls** to Event Service for seat checks and updates
+- Kafka message is published **after** the DB write succeeds
+- Notification Service runs a Kafka consumer in a **background daemon thread** (`threading.Thread(daemon=True)`)
+
+---
+
+## Flow 4: Monitoring & Metrics
+
+```
+  Prometheus (:9090)            Event Svc (:8002)       Reg. Svc (:8003)        Grafana (:3000)
+    │                                 │                       │                       │
+    │  ┌── Every scrape interval ─────┤                       │                       │
+    │  │                              │                       │                       │
+    │  │  GET /metrics                │                       │                       │
+    │  │─────────────────────────────►│                       │                       │
+    │  │  events_created,             │                       │                       │
+    │  │  events_available_seats      │                       │                       │
+    │  │◄─────────────────────────────│                       │                       │
+    │  │                              │                       │                       │
+    │  │  GET /metrics                │                       │                       │
+    │  │──────────────────────────────────────────────────────►│                       │
+    │  │  total_registration          │                       │                       │
+    │  │◄──────────────────────────────────────────────────────│                       │
+    │  │                              │                       │                       │
+    │  └──────────────────────────────┤                       │                       │
+    │                                 │                       │                       │
+    │                                 │                       │    PromQL queries                 │
+    │◄──────────────────────────────────────────────────────────────────────────────│
+    │  Time-series data               │                       │                       │
+    │──────────────────────────────────────────────────────────────────────────────►│
+    │                                 │                       │    Render dashboards              │
+    │                                 │                       │                       │
+```
+
+**Custom metrics exposed:**
+
+| Metric | Service | Type | Description |
+|---|---|---|---|
+| `events_created` | Event Service | Counter | Total events created |
+| `total_registration` | Registration Service | Counter | Total successful registrations |
+| `events_available_seats` | Event Service | Gauge | Remaining seats (by `event_id`, `event_title`) |
+
+---
+
+## Flow 5: Booking Cancellation & Seat Restoration
+
+```
+  Client              NGINX (:8000)        Reg. Svc (:8003)       Event Svc (:8002)
+    │                       │                     │                      │
+    │ DELETE                │                     │                      │
+    │ /delete_registration  │                     │                      │
+    │ /{user_id}?event_id=X │                     │                      │
+    │──────────────────────►│                     │                      │
+    │                       │                     │                      │
+    │                       │ proxy_pass          │                      │
+    │                       │────────────────────►│                      │
+    │                       │                     │                      │
+    │                       │                     │ Check registration   │
+    │                       │                     │ exists (PostgreSQL)  │
+    │                       │                     │                      │
+    │                       │                     │ DELETE record        │
+    │                       │                     │ from PostgreSQL      │
+    │                       │                     │                      │
+    │                       │                     │ HTTP PATCH           │
+    │                       │                     │ /increase_seat       │
+    │                       │                     │─────────────────────►│
+    │                       │                     │                      │
+    │                       │                     │                      │ UPDATE seats + 1
+    │                       │                     │                      │ (PostgreSQL)
+    │                       │                     │                      │
+    │                       │                     │                      │ Update Prometheus
+    │                       │                     │                      │ gauge
+    │                       │                     │                      │
+    │                       │                     │  {message,           │
+    │                       │                     │   available_seats}   │
+    │                       │                     │◄─────────────────────│
+    │                       │                     │                      │
+    │                       │ "Cancelled          │                      │
+    │                       │  successfully"      │                      │
+    │                       │◄────────────────────│                      │
+    │  200 OK               │                     │                      │
+    │◄──────────────────────│                     │                      │
+    │                       │                     │                      │
+```
+
+**Key details:**
+- Seat restoration happens **after** the registration is deleted from the database
+- The Event Service updates the Prometheus gauge immediately upon seat change
+- No Kafka event is published for cancellations (only for bookings)
+
+---
+
+## Inter-Service Communication Summary
+
+| From | To | Method | Endpoint | Purpose |
+|---|---|---|---|---|
+| NGINX | User Service | HTTP (internal) | `GET /auth/verify` | JWT validation subrequest |
+| Registration Service | Event Service | HTTP | `GET /event/events/{id}` | Check seat availability |
+| Registration Service | Event Service | HTTP | `PATCH /event/event/{id}/decrease_seat` | Decrement seats on booking |
+| Registration Service | Event Service | HTTP | `PATCH /event/event/{id}/increase_seat` | Restore seats on cancellation |
+| Registration Service | Kafka | Kafka Producer | `registration-created` topic | Async notification trigger |
+| Kafka | Notification Service | Kafka Consumer | `registration-created` topic | Consume and send notifications |
+| Prometheus | Event Service | HTTP | `GET /metrics` | Scrape custom metrics |
+| Prometheus | Registration Service | HTTP | `GET /metrics` | Scrape custom metrics |
