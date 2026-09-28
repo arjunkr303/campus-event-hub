@@ -137,6 +137,7 @@ Each service has its own:
 - `requirements.txt` — Python dependencies
 - `tests/` — unit tests (pytest + httpx)
 - `.env` — environment variables (gitignored)
+- `.env.example` — env template with placeholder values (committed)
 
 ---
 
@@ -148,7 +149,7 @@ Each service has its own:
 | **Python 3.10** | Runtime |
 | **FastAPI** | API framework |
 | **SQLModel** | ORM (SQLAlchemy + Pydantic) |
-| **PostgreSQL** (Supabase) | Primary database |
+| **PostgreSQL** | Primary database (local Docker container or Supabase) |
 | **JWT** (`python-jose`, `pyjwt`) | Authentication & authorization |
 | **Kafka** (`kafka-python`) | Async message broker |
 | **Prometheus** (`prometheus-client`) | Metrics collection |
@@ -326,23 +327,23 @@ campus-event-hub/
 
 ### Prerequisites
 
-- **Docker** & **Docker Compose** (for local development)
+- **Docker** & **Docker Compose** (for local development — PostgreSQL runs as a container)
 - **kubectl** & a Kubernetes cluster (for K8s deployment — Minikube, kind, or cloud)
 - **Helm 3** (for Helm-based deployment)
 - **Python 3.10** (for running services outside Docker)
-- A **PostgreSQL** database (or Supabase account)
 
 ### Docker Compose (Local Development)
 
-1. **Create `.env` files** for each service (see [Environment Configuration](#environment-configuration)):
+1. **Create `.env` files** from the templates:
+   ```bash
+   cp user-service/.env.example user-service/.env
+   cp event-service/.env.example event-service/.env
+   cp registration-service/.env.example registration-service/.env
+   cp notification-service/.env.example notification-service/.env
    ```
-   user-service/.env
-   event-service/.env
-   registration-service/.env
-   notification-service/.env
-   ```
+   The defaults point to the local PostgreSQL container — no edits needed to get started.
 
-2. **Start all services:**
+2. **Start all services** (PostgreSQL starts first, services wait for it to be healthy):
    ```bash
    docker compose up --build
    ```
@@ -356,6 +357,7 @@ campus-event-hub/
    - Swagger UI (User): http://localhost:8001/docs
    - Swagger UI (Event): http://localhost:8002/docs
    - Swagger UI (Registration): http://localhost:8003/docs
+   - PostgreSQL: `localhost:5432` (user: `campus_user`, pass: `campus_pass`, db: `campus_event_hub`)
    - Kafka UI: http://localhost:8088
    - Prometheus: http://localhost:9090
    - Grafana: http://localhost:3000 (default login: `admin` / `admin`)
@@ -468,6 +470,7 @@ Then edit each `.env` file with your real credentials. See the `.env.example` fi
 | **Event Service** | `8002` | `8000` | Event catalog management |
 | **Registration Service** | `8003` | `8000` | Event booking management |
 | **Notification Service** | `8004` | `8000` | Kafka consumer for notifications |
+| **PostgreSQL** | `5432` | `5432` | Database (persistent volume) |
 | **Kafka** | `9092` | `9092` | Message broker (external listener) |
 | **Kafka (Internal)** | — | `29092` | Inter-container broker communication |
 | **Kafka UI** | `8088` | `8080` | Kafka cluster management UI |

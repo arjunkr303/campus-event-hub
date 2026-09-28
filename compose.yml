@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-campus_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campus_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-campus_event_hub}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-campus_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   nginx:
     build:
       context: ./infrastructure/nginx
@@ -27,6 +44,9 @@ services:
     volumes:
       - ./user-service:/app
       - /app/venv
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   event-service:
     build:
@@ -40,6 +60,9 @@ services:
     volumes:
       - ./event-service:/app
       - /app/venv
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   registration-service:
     build:
@@ -53,6 +76,9 @@ services:
     volumes:
       - ./registration-service:/app
       - /app/venv
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   notification-service:
     build: 
@@ -65,6 +91,9 @@ services:
       - ./notification-service/.env
     volumes:
       - ./notification-service:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   
   kafka:
@@ -118,7 +147,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:-admin}
     volumes:
       - grafana-storage:/var/lib/grafana
       - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -127,4 +156,5 @@ services:
       - prometheus
 
 volumes:
+  postgres-data:
   grafana-storage:
